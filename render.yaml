@@ -1,0 +1,44 @@
+# Render blueprint (infrastructure-as-code).
+# Deploy: Render dashboard -> New -> Blueprint -> connect this repo -> Apply.
+# Provisions the web service + a Postgres database, auto-deploys on push.
+#
+# The web service alone runs the whole flow (upload -> extract -> validate ->
+# ERP push | exception queue). Offline-friendly defaults so the live URL works
+# with no secrets.
+
+services:
+  - type: web
+    name: docintel-erp-agent
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: prod
+      - key: OCR_PROVIDER
+        value: pdftext
+      - key: ERP_PROVIDER
+        value: mock
+      - key: LLM_PROVIDER
+        value: anthropic
+      # Set for LLM extraction (vs the deterministic regex extractor).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Set ERP_PROVIDER=sap_odata + these for a real OData push.
+      - key: ERP_ODATA_BASE_URL
+        sync: false
+      - key: ERP_ODATA_TOKEN
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: docintel-erp-db
+          property: connectionString
+
+databases:
+  - name: docintel-erp-db
+    plan: free
+    postgresMajorVersion: "16"

@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: agent
+      POSTGRES_PASSWORD: agent
+      POSTGRES_DB: agentdb
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+psycopg2://agent:agent@db:5432/agentdb
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: dev-only-change-me
+      OCR_PROVIDER: ${OCR_PROVIDER:-pdftext}
+      ERP_PROVIDER: ${ERP_PROVIDER:-mock}
+      ERP_ODATA_BASE_URL: ${ERP_ODATA_BASE_URL:-}
+      ERP_ODATA_TOKEN: ${ERP_ODATA_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: .
+    command: celery -A workers.celery_app.celery_app worker --loglevel=info
+    depends_on:
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+psycopg2://agent:agent@db:5432/agentdb
+      OCR_PROVIDER: ${OCR_PROVIDER:-pdftext}
+      ERP_PROVIDER: ${ERP_PROVIDER:-mock}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}

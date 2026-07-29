@@ -1,0 +1,19 @@
+[project]
+name = "agent-platform-foundation"
+version = "0.1.0"
+description = "Production foundation for deployable, EU AI Act-compliant AI agents."
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+# B008: FastAPI's Depends()/Header() in argument defaults is the intended idiom.
+ignore = ["B008"]

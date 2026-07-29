@@ -1,0 +1,34 @@
+# --- Runtime dependencies only. Dev/test/eval tools live in requirements-dev.txt ---
+
+# Web / API
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-multipart==0.0.20
+
+# Agent orchestration
+langgraph==0.2.60
+langchain-core==0.3.28
+
+# LLM providers (provider-agnostic client)
+anthropic==0.42.0
+openai==1.59.6
+
+# Database (multi-tenant)
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg2-binary==2.9.10
+
+# Async workers
+celery==5.4.0
+redis==5.2.1
+
+# Document text extraction (OCR layer; native-PDF text, no system binary)
+pypdf==5.1.0
+
+# Observability
+structlog==24.4.0
+
+# Auth
+pyjwt==2.10.1

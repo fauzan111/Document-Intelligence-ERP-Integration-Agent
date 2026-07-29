@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Document Intelligence & ERP Agent — Live Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .fade-in { animation: fade .25s ease-out; } @keyframes fade { from {opacity:0;transform:translateY(4px)} to {opacity:1;transform:none} }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+  <header class="bg-white border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-teal-600 flex items-center justify-center text-white font-bold">DI</div>
+        <div>
+          <h1 class="font-semibold text-slate-900 leading-tight">Document Intelligence &amp; ERP Agent</h1>
+          <p class="text-xs text-slate-500">OCR → extract → <span class="font-semibold">validate (code)</span> → SAP-shaped ERP</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4 text-sm">
+        <span id="tenantBadge" class="hidden px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-mono text-xs"></span>
+        <span class="flex items-center gap-1.5 text-emerald-600"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Live</span>
+        <a href="/docs" class="text-teal-600 hover:underline">API docs</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8 grid gap-6 lg:grid-cols-12">
+    <!-- Left: upload -->
+    <section class="lg:col-span-5 space-y-6">
+      <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <h2 class="font-semibold text-slate-900 mb-1">1 · Sign in</h2>
+        <p class="text-xs text-slate-500 mb-3">Each tenant's documents are isolated.</p>
+        <div class="flex gap-2">
+          <input id="tenantName" value="Acme Manufacturing" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <button id="signupBtn" class="bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg px-4">Start</button>
+        </div>
+      </div>
+
+      <div id="uploadCard" class="bg-white rounded-xl border border-slate-200 p-5 opacity-50 pointer-events-none transition">
+        <h2 class="font-semibold text-slate-900 mb-1">2 · Submit an invoice</h2>
+        <p class="text-xs text-slate-500 mb-3">Paste invoice text (or load a sample). The agent extracts, validates, and files it.</p>
+        <div class="flex gap-2 mb-2 text-xs">
+          <button data-s="valid" class="sample border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded-lg px-2 py-1">✓ Valid sample</button>
+          <button data-s="bad_totals" class="sample border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-lg px-2 py-1">Bad totals</button>
+          <button data-s="bad_vat" class="sample border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-lg px-2 py-1">Bad VAT</button>
+        </div>
+        <textarea id="docText" rows="9" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono" placeholder="Vendor: ...&#10;VAT: IT...&#10;Invoice: ...&#10;- item | qty .. | unit .. | amount ..&#10;Subtotal: ..&#10;VAT amount: ..&#10;Total: .."></textarea>
+        <button id="submitBtn" class="w-full mt-3 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium rounded-lg py-2.5">Process document</button>
+        <div id="result" class="mt-4"></div>
+      </div>
+    </section>
+
+    <!-- Right: documents + exception queue -->
+    <section class="lg:col-span-7 space-y-4">
+      <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-semibold text-slate-900">Documents</h2>
+          <button id="refresh" class="text-xs text-teal-600 hover:underline">Refresh</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead><tr class="text-left text-xs text-slate-400 border-b border-slate-200">
+              <th class="py-2 pr-2">Vendor</th><th class="pr-2">Status</th><th class="pr-2">Total</th><th class="pr-2">ERP id</th><th>Issues</th>
+            </tr></thead>
+            <tbody id="docRows"><tr><td colspan="5" class="py-6 text-center text-slate-400">No documents yet.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <h2 class="font-semibold text-slate-900 mb-1">Exception queue</h2>
+        <p class="text-xs text-slate-500 mb-3">Documents that failed deterministic validation, with the exact field that failed. Fix a value and re-file — the correction is re-validated by the same rules.</p>
+        <div id="exceptionList" class="space-y-3 text-sm"><p class="text-slate-400">Nothing in the queue.</p></div>
+      </div>
+
+      <div class="bg-teal-50 border border-teal-100 rounded-xl p-4 text-xs text-teal-900 leading-relaxed">
+        <strong>LLMs extract, code validates.</strong> The model proposes fields; a deterministic layer checks VAT checksums, line-item math, and totals reconciliation. Only records that pass every rule are written to the ERP — the rest go to a human. Nothing is silently guessed.
+      </div>
+    </section>
+  </main>
+
+  <footer class="max-w-6xl mx-auto px-6 pb-10 text-center text-xs text-slate-400">
+    Offline mode: pypdf text extraction + regex extractor + mock SAP OData. Set ANTHROPIC_API_KEY / ERP_PROVIDER=sap_odata on the server for the real thing.
+  </footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let token = localStorage.getItem("di_token") || null;
+let tenantId = localStorage.getItem("di_tenant") || null;
+
+const SAMPLES = {
+  valid: `Vendor: Rossi Manifattura SRL\nVAT: IT07643520567\nInvoice: INV-2026-000123\nDate: 2026-03-14\nCurrency: EUR\n- Steel brackets | qty 100 | unit 4.50 | amount 450.00\n- Assembly labor | qty 10 | unit 35.00 | amount 350.00\nSubtotal: 800.00\nVAT amount: 176.00\nTotal: 976.00`,
+  bad_totals: `Vendor: Bianchi Forniture SPA\nVAT: IT00743110157\nInvoice: INV-2026-000200\nDate: 2026-03-20\nCurrency: EUR\n- Packaging film | qty 50 | unit 2.00 | amount 100.00\nSubtotal: 100.00\nVAT amount: 22.00\nTotal: 150.00`,
+  bad_vat: `Vendor: Verdi Componenti SRL\nVAT: IT12345678901\nInvoice: INV-2026-000300\nDate: 2026-03-22\nCurrency: EUR\n- Sensor modules | qty 20 | unit 15.00 | amount 300.00\nSubtotal: 300.00\nVAT amount: 66.00\nTotal: 366.00`,
+};
+
+async function api(path, opts = {}) {
+  const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+  if (token) headers["Authorization"] = "Bearer " + token;
+  const res = await fetch(path, { ...opts, headers });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.json();
+}
+
+function signedIn() {
+  $("tenantBadge").classList.remove("hidden");
+  $("tenantBadge").textContent = "tenant " + tenantId.slice(0, 8);
+  $("uploadCard").classList.remove("opacity-50", "pointer-events-none");
+  refresh();
+}
+
+$("signupBtn").onclick = async () => {
+  try {
+    const out = await api("/tenants/signup", { method: "POST", body: JSON.stringify({ name: $("tenantName").value })});
+    token = out.access_token; tenantId = out.tenant_id;
+    localStorage.setItem("di_token", token); localStorage.setItem("di_tenant", tenantId);
+    signedIn();
+  } catch (e) { alert("Signup failed: " + e.message); }
+};
+
+document.querySelectorAll(".sample").forEach(b => b.onclick = () => { $("docText").value = SAMPLES[b.dataset.s]; });
+
+function statusPill(s) {
+  const map = { pushed_to_erp: "bg-emerald-100 text-emerald-700", validated: "bg-emerald-100 text-emerald-700",
+    exception: "bg-amber-100 text-amber-700", failed: "bg-red-100 text-red-700",
+    received: "bg-blue-100 text-blue-700", extracted: "bg-blue-100 text-blue-700" };
+  return '<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded ' + (map[s]||"bg-slate-100") + '">' + s.replace(/_/g," ").toUpperCase() + '</span>';
+}
+
+function renderResult(doc) {
+  const ok = doc.status === "pushed_to_erp";
+  const head = ok
+    ? '<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">VALIDATED → ERP</span>'
+    : '<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">SENT TO EXCEPTION QUEUE</span>';
+  const issues = (doc.issues||[]).map(i => '<li class="text-red-600">• <code>'+i.field+'</code> — '+i.message+'</li>').join("");
+  $("result").innerHTML = '<div class="fade-in border border-slate-200 rounded-lg p-3 space-y-1">'
+    + '<div class="flex items-center gap-2">'+head+' '+statusPill(doc.status)+'</div>'
+    + '<div class="text-xs text-slate-500">extracted by <strong>'+(doc.extracted_by||"—")+'</strong>'
+    + (doc.erp_record_id ? ' · ERP <code>'+doc.erp_record_id+'</code>' : '')+'</div>'
+    + (issues ? '<ul class="text-xs mt-1">'+issues+'</ul>' : '') + '</div>';
+}
+
+$("submitBtn").onclick = async () => {
+  if (!$("docText").value.trim()) return alert("Paste invoice text or load a sample.");
+  try {
+    const doc = await api("/documents", { method: "POST",
+      body: JSON.stringify({ filename: "invoice-" + Date.now() + ".txt", text: $("docText").value }) });
+    renderResult(doc); refresh();
+  } catch (e) { alert("Failed: " + e.message); }
+};
+
+async function resolve(id, extracted) {
+  const field = prompt("Correct the TOTAL value (subtotal + VAT):", extracted.total);
+  if (field === null) return;
+  extracted.total = parseFloat(field);
+  try {
+    const doc = await api("/exceptions/" + id + "/resolve", { method: "POST", body: JSON.stringify(extracted) });
+    renderResult(doc); refresh();
+  } catch (e) { alert("Resolve failed: " + e.message); }
+}
+
+async function refresh() {
+  try {
+    const docs = await api("/documents");
+    $("docRows").innerHTML = docs.length ? docs.map(d =>
+      '<tr class="border-b border-slate-100"><td class="py-2 pr-2">' + (d.extracted?.vendor_name || "—") + '</td>'
+      + '<td class="pr-2">' + statusPill(d.status) + '</td>'
+      + '<td class="pr-2">' + (d.extracted ? d.extracted.total : "—") + '</td>'
+      + '<td class="pr-2 font-mono text-xs text-slate-500">' + (d.erp_record_id || "—") + '</td>'
+      + '<td class="text-xs text-slate-500">' + (d.issues?.length ? d.issues.map(i=>i.code).join(", ") : "—") + '</td></tr>'
+    ).join("") : '<tr><td colspan="5" class="py-6 text-center text-slate-400">No documents yet.</td></tr>';
+
+    const exc = await api("/exceptions");
+    $("exceptionList").innerHTML = exc.length ? exc.map(d => {
+      const issues = (d.issues||[]).map(i => '<li>• <code>'+i.field+'</code> — '+i.message+'</li>').join("");
+      return '<div class="border border-amber-200 bg-amber-50 rounded-lg p-3">'
+        + '<div class="flex items-center justify-between"><span class="font-medium">'+(d.extracted?.vendor_name||d.filename)+'</span>'
+        + '<button class="text-xs bg-teal-600 text-white rounded px-2 py-1" onclick=\'resolveDoc("'+d.id+'")\'>Fix &amp; re-file</button></div>'
+        + '<ul class="text-xs text-red-700 mt-1">'+issues+'</ul></div>';
+    }).join("") : '<p class="text-slate-400">Nothing in the queue.</p>';
+    window._exc = Object.fromEntries(exc.map(d => [d.id, d.extracted]));
+  } catch { /* not signed in */ }
+}
+window.resolveDoc = (id) => resolve(id, { ...window._exc[id] });
+$("refresh").onclick = refresh;
+
+if (token && tenantId) signedIn();
+</script>
+</body>
+</html>
